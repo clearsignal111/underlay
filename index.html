@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Underlay</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080808;--surface:#0f0f0f;--border:#1c1c1c;
+  --text:#c4c4c4;--dim:#444;--accent:#e0e0e0;--hi:#b8a4f0;
+}
+body{background:var(--bg);color:var(--text);font-family:'Georgia',serif;min-height:100vh;display:flex;flex-direction:column}
+nav{padding:1.6rem 2rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:0.8rem;letter-spacing:0.16em;color:var(--accent);text-decoration:none}
+nav a{color:var(--dim);text-decoration:none;font-size:0.72rem;letter-spacing:0.08em;margin-left:1.8rem;transition:color .2s}
+nav a:hover{color:var(--text)}
+.hero{max-width:600px;margin:0 auto;padding:4.5rem 2rem 3rem;text-align:center}
+.hero h1{font-size:1.5rem;font-weight:normal;color:var(--accent);margin-bottom:1rem}
+.hero p{font-size:0.88rem;color:var(--dim);line-height:1.8}
+main{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:2rem;max-width:1080px;width:100%;margin:0 auto;padding:2rem}
+@media(max-width:680px){main{grid-template-columns:1fr}}
+.panel{display:flex;flex-direction:column;gap:0.8rem}
+label{font-size:0.68rem;letter-spacing:0.12em;color:var(--dim);text-transform:uppercase}
+textarea{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Georgia',serif;font-size:0.9rem;line-height:1.75;padding:1.1rem;min-height:260px;resize:vertical;outline:none;width:100%;transition:border-color .2s}
+textarea:focus{border-color:#2a2a2a}
+textarea::placeholder{color:#2e2e2e}
+button{background:transparent;border:1px solid #2a2a2a;color:var(--text);font-family:'Georgia',serif;font-size:0.78rem;letter-spacing:0.1em;padding:0.6rem 1.4rem;cursor:pointer;transition:border-color .2s;text-transform:lowercase}
+button:hover{border-color:#555}
+button:disabled{opacity:0.25;cursor:default}
+.output{background:var(--surface);border:1px solid var(--border);min-height:260px;padding:1.4rem;font-size:0.88rem;line-height:1.8}
+.output.empty{color:#2a2a2a;font-style:italic}
+.assumption{border-left:2px solid var(--hi);padding-left:1rem;margin-bottom:1.3rem}
+.assumption p{color:var(--accent)}
+.assumption span{display:block;font-size:0.75rem;color:var(--dim);margin-top:0.25rem}
+.loading{color:var(--dim);font-size:0.82rem;font-style:italic}
+.err{color:#c86060;font-size:0.78rem;margin-top:0.3rem}
+footer{padding:1.2rem 2rem;border-top:1px solid var(--border);display:flex;gap:1.5rem}
+footer a{color:var(--dim);text-decoration:none;font-size:0.72rem;letter-spacing:0.06em;transition:color .2s}
+footer a:hover{color:var(--text)}
+</style>
+</head>
+<body>
+<nav>
+  <a href="https://clearsignal111.github.io" class="logo">clearsignal</a>
+  <div>
+    <a href="https://clearsignal111.substack.com">writing</a>
+    <a href="https://github.com/clearsignal111/underlay">source</a>
+  </div>
+</nav>
+<div class="hero">
+  <h1>What does this assume?</h1>
+  <p>Paste any text. Get back what it depends on but never examines.</p>
+</div>
+<main>
+  <div class="panel">
+    <label>text</label>
+    <textarea id="input" placeholder="an argument, a strategy, a pitch, a decision."></textarea>
+    <div style="display:flex;justify-content:flex-end">
+      <button id="run" onclick="analyze()">extract</button>
+    </div>
+    <div id="err" class="err" style="display:none"></div>
+  </div>
+  <div class="panel">
+    <label>assumptions</label>
+    <div class="output empty" id="output">the structure underneath will appear here.</div>
+  </div>
+</main>
+<footer>
+  <a href="https://clearsignal111.github.io">clearsignal</a>
+  <a href="https://clearsignal111.substack.com">substack</a>
+  <a href="https://github.com/clearsignal111/underlay">github</a>
+</footer>
+<script>
+const API = 'https://underlay-aajy6vj5b-clearsignal111s-projects.vercel.app';
+async function analyze() {
+  const text = document.getElementById('input').value.trim();
+  const out = document.getElementById('output');
+  const err = document.getElementById('err');
+  const btn = document.getElementById('run');
+  err.style.display = 'none';
+  if (!text) { showErr('paste some text first'); return; }
+  out.className = 'output';
+  out.innerHTML = '<div class="loading">reading the ground...</div>';
+  btn.disabled = true;
+  try {
+    const res = await fetch(API + '/api/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    out.className = 'output';
+    out.innerHTML = data.result.map(a =>
+      `<div class="assumption"><p>${a.assumption}</p><span>${a.note}</span></div>`
+    ).join('');
+  } catch(e) {
+    out.className = 'output empty';
+    out.textContent = 'the structure underneath will appear here.';
+    showErr(e.message);
+  }
+  btn.disabled = false;
+}
+function showErr(m) {
+  const e = document.getElementById('err');
+  e.textContent = m; e.style.display = 'block';
+}
+document.getElementById('input').addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') analyze();
+});
+</script>
+</body>
+</html>
